@@ -18,7 +18,9 @@ Functions:
 
 # %% ---- 2024-05-10 ------------------------
 # Requirements and constants
+import argparse
 import contextlib
+import matplotlib
 
 import numpy as np
 import pandas as pd
@@ -41,31 +43,55 @@ training_samples = total_length // 2
 # Function and class
 
 
-def generate_random_series(n: int = total_length):
+def generate_random_series(n: int = total_length, use_history: int = True):
+    history = root.joinpath('res/history.csv')
+    history.parent.mkdir(exist_ok=True)
+
+    if use_history and history.is_file():
+        logger.debug(f'Using history: {history}')
+        return pd.read_csv(history)
+
     dvalue = np.random.randn(n)
     value = np.array([np.sum(dvalue[:i]) for i in range(n+1)])
     df = pd.DataFrame()
     df['x'] = range(n)
     df['dvalue'] = dvalue
     df['value'] = value[1:]
+    df.to_csv(history)
+    logger.debug(f'Wrote history: {history}')
     return df
 
 
-def fit(df: pd.DataFrame):
+def fit(df: pd.DataFrame,
+        training_samples: int = training_samples,
+        total_length: int = total_length,
+        sample_length: int = sample_length,
+        predict_offset: int = 0
+        ):
+    """
+    Fits a linear regression model to the given DataFrame.
+
+    Args:
+        df (pd.DataFrame): The DataFrame containing the data.
+        training_samples (int): The number of training samples to use. Defaults to training_samples.
+        total_length (int): The total length of the data. Defaults to total_length.
+        sample_length (int): The length of each sample. Defaults to sample_length.
+
+    Returns:
+        None
+    """
+
     # --------------------
-    training_idx = [i for i in range(training_samples)]
-    testing_idx = [i for i in range(
-        training_samples, total_length-sample_length)]
+    training_idx = list(range(training_samples))
+    testing_idx = list(
+        range(training_samples, total_length - sample_length - predict_offset))
 
     # --------------------
     x_training = np.stack([
         np.array(df.iloc[i:i+sample_length]['value']) for i in training_idx])
 
     y_training = np.stack([
-        np.array(df.iloc[i+sample_length:i+sample_length+1]['value']) for i in training_idx]).squeeze()
-
-    logger.debug(
-        f'Prepared training data: {training_idx}, {(x_training.shape, y_training.shape)}')
+        np.array(df.iloc[i+sample_length+predict_offset:i+sample_length+predict_offset+1]['value']) for i in training_idx]).squeeze()
 
     # --------------------
     x_testing = np.stack([
@@ -75,7 +101,7 @@ def fit(df: pd.DataFrame):
         np.array(df.iloc[i+sample_length:i+sample_length+1]['value']) for i in testing_idx]).squeeze()
 
     logger.debug(
-        f'Prepared testing data: {testing_idx}, {(x_testing.shape, y_testing.shape)}')
+        f'Segment data: training: {training_idx[0]}...{training_idx[-1]}, testing: {testing_idx[0]}...{testing_idx[-1]}')
 
     # --------------------
     regressor = linear_model.LinearRegression()
@@ -85,7 +111,7 @@ def fit(df: pd.DataFrame):
     logger.debug(f'MSE of {regressor} is {mse}')
 
     df['pred'] = None
-    df.loc[[e+sample_length for e in testing_idx], 'pred'] = y_pred
+    df.loc[[e+sample_length+predict_offset for e in testing_idx], 'pred'] = y_pred
 
     df['diff'] = df['value'] - df['pred']
 
@@ -104,18 +130,34 @@ def use_ax(ax, title: str = 'Title'):
 # %% ---- 2024-05-10 ------------------------
 # Play ground
 if __name__ == "__main__":
-    logger.info('Start')
-    df = generate_random_series()
+    # --------------------
+    parser = argparse.ArgumentParser('Native regression of random time series')
+    parser.add_argument('-p', '--predict',
+                        dest='predict_offset', default=5, type=int)
+    parser.add_argument('-u', '--usehistory',
+                        dest='use_history', action='store_true')
 
-    fit(df)
+    option = parser.parse_args()
+
+    # --------------------
+    logger.info(f'Start with {option}')
+
+    predict_offset = option.predict_offset
+    use_history = option.use_history
+
+    df = generate_random_series(use_history=use_history)
+    fit(df, predict_offset=predict_offset)
     print(df)
 
     # --------------------
     sns.set_style('darkgrid')
     palette = 'RdBu'  # 'Spectral'
     palette = sns.diverging_palette(
-        0, 180, s=100, l=50, center='light', as_cmap=True)
+        0, 180, s=80, l=50, center='light', as_cmap=True)
     fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+
+    suptitle = f'Predict offset is {predict_offset}'
+    fig.suptitle(suptitle)
 
     with use_ax(axes[0, 0], 'Random data') as ax:
         sns.scatterplot(
@@ -126,17 +168,23 @@ if __name__ == "__main__":
             df, ax=ax, x='x', y='value', color='#333', size=1, legend=False, zorder=1)
         sns.scatterplot(
             df, ax=ax, x='x', y='pred', hue="dvalue", palette=palette, zorder=2)
+        sns.lineplot(
+            df, ax=ax, x='x', y='pred', color='#a00', size=1, legend=False, zorder=3)
+        ax.invert_yaxis()
+
+    k = np.max(df['diff'].map(np.abs))
+    hue_norm = matplotlib.colors.Normalize(-k, k)
 
     with use_ax(axes[1, 0], 'Diff: Value - prediction') as ax:
         sns.scatterplot(
-            df, ax=ax, x='x', y='diff', hue="diff", palette=palette)
+            df, ax=ax, x='x', y='diff', hue="diff", palette=palette, hue_norm=hue_norm)
 
     with use_ax(axes[1, 1], 'Diff vs dvalue') as ax:
         sns.scatterplot(
-            df, ax=ax, x='dvalue', y='diff', hue="diff", palette=palette)
+            df, ax=ax, x='dvalue', y='diff', hue="diff", palette=palette, hue_norm=hue_norm)
 
     fig.tight_layout()
-    fig.savefig(root.joinpath('res.jpg'))
+    fig.savefig(root.joinpath(f'res/{suptitle}.jpg'))
     plt.show()
 
     logger.info('Finished')
