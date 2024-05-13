@@ -19,6 +19,7 @@ Functions:
 # %% ---- 2024-05-13 ------------------------
 # Requirements and constants
 import argparse
+import matplotlib
 import contextlib
 
 import numpy as np
@@ -75,6 +76,7 @@ def fit(df: pd.DataFrame):
     df.loc[testing_index, 'meanPred'] = mean_prediction
     df.loc[testing_index, 'stdPred'] = std_prediction
     df.loc[training_index, 'training'] = True
+    df['diff'] = df['value'] - df['meanPred']
 
 
 @contextlib.contextmanager
@@ -92,24 +94,40 @@ def use_ax(ax, title: str = 'Title'):
 # %% ---- 2024-05-13 ------------------------
 # Play ground
 if __name__ == "__main__":
-    logger.info('Started')
+    # --------------------
+    parser = argparse.ArgumentParser(
+        'Gaussian process estimation for random time series')
+    parser.add_argument('-g', '--generate', help='If generate new data flag',
+                        dest='generate_data_flag', action='store_true')
+    parser.add_argument('-s', '--show', help='If show the image',
+                        dest='show_image_flag', action='store_true')
 
-    df = generate_random_series(generate_data_flag=False)
+    option = parser.parse_args()
+
+    # --------------------
+    logger.info(f'Started with {option}')
+
+    df = generate_random_series(generate_data_flag=option.generate_data_flag)
     fit(df)
     print(df)
+
+    k = np.max(df['diff'].map(np.abs))
+    hue_norm = matplotlib.colors.Normalize(-k, k)
 
     # --------------------
     sns.set_style('darkgrid')
     palette = 'RdBu'  # 'Spectral'
     palette = sns.diverging_palette(
         0, 180, s=80, l=50, center='light', as_cmap=True)
-    fig, axs = plt.subplots(1, 2, figsize=(12, 4))
+    fig, axs = plt.subplots(2, 2, figsize=(12, 8))
 
-    with use_ax(axs[0], 'Random data') as ax:
+    with use_ax(axs[0, 0], 'Random data') as ax:
         sns.scatterplot(
-            df, ax=ax, x='x', y='value', hue='dvalue', palette=palette)
+            df, ax=ax, x='x', y='value', hue='dvalue', palette=palette, zorder=1)
+        sns.lineplot(
+            df, ax=ax, x='x', y='value', color='#0003', zorder=2)
 
-    with use_ax(axs[1], 'Pred') as ax:
+    with use_ax(axs[0, 1], 'Pred') as ax:
         sns.lineplot(
             df, ax=ax, x='x', y='value', color='#333', size=1, legend=False, zorder=1)
         sns.scatterplot(
@@ -119,13 +137,26 @@ if __name__ == "__main__":
         _df = df.copy()
         _df['upper'] = _df['meanPred'] + _df['stdPred']
         _df['lower'] = _df['meanPred'] - _df['stdPred']
-        ax.fill_between(_df['x'], _df['upper'],
-                        _df['lower'], alpha=0.5, color='#a00')
+        ax.fill_between(_df['x'].astype(np.float32),
+                        _df['upper'].astype(np.float32),
+                        _df['lower'].astype(np.float32),
+                        alpha=0.3, color='#a00')
         # ax.invert_yaxis()
 
-    fig.tight_layout()
+    with use_ax(axs[1, 0], 'Compare') as ax:
+        sns.lineplot(df, ax=ax, x='x', y='meanPred', color='#a00')
+        sns.lineplot(df, ax=ax, x='x', y='value', color='#03a')
+        ax.legend(labels=['meanPred', None, 'value', None])
 
-    plt.show()
+    with use_ax(axs[1, 1], 'Diff') as ax:
+        sns.scatterplot(df, ax=ax, x='stdPred', y='diff',
+                        hue='diff', palette=palette)
+
+    fig.tight_layout()
+    fig.savefig(root.joinpath('res/gaussian_process.jpg'))
+
+    if option.show_image_flag:
+        plt.show()
 
     logger.info('Finished')
 

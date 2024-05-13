@@ -109,7 +109,8 @@ def use_ax(ax, title: str = 'Title'):
 # Play ground
 if __name__ == "__main__":
     # --------------------
-    parser = argparse.ArgumentParser('Native regression of random time series')
+    parser = argparse.ArgumentParser(
+        'Native regression for random time series')
     parser.add_argument('-p', '--predict',
                         dest='predict_offset', default=0, type=int)
     parser.add_argument('-g', '--generate', help='If generate new data flag',
@@ -141,7 +142,9 @@ if __name__ == "__main__":
 
     with use_ax(axs[0, 0], 'Random data') as ax:
         sns.scatterplot(
-            df, ax=ax, x='x', y='value', hue='dvalue', palette=palette)
+            df, ax=ax, x='x', y='value', hue='dvalue', palette=palette, zorder=1)
+        sns.lineplot(
+            df, ax=ax, x='x', y='value', color='#0003', zorder=2)
 
     with use_ax(axs[0, 1], 'Pred') as ax:
         sns.lineplot(
