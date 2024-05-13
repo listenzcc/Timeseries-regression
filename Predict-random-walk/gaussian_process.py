@@ -45,9 +45,11 @@ def fit(df: pd.DataFrame):
     total_length = len(df)
     training_samples = total_length // 10
 
-    all_index = list(df.index)
+    testing_index = list(df.index)
+
+    # Only train on the first half data
+    all_index = list(df.index[:int(total_length * 0.7)])
     np.random.shuffle(all_index)
-    testing_index = all_index
     training_index = all_index[:training_samples]
 
     # --------------------
