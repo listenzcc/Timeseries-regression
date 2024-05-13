@@ -43,13 +43,13 @@ training_samples = total_length // 2
 # Function and class
 
 
-def generate_random_series(n: int = total_length, use_history: int = True):
-    history = root.joinpath('res/history.csv')
-    history.parent.mkdir(exist_ok=True)
+def generate_random_series(n: int = total_length, generate_data_flag: bool = False):
+    data = root.joinpath('res/data.csv')
+    data.parent.mkdir(exist_ok=True)
 
-    if use_history and history.is_file():
-        logger.debug(f'Using history: {history}')
-        return pd.read_csv(history)
+    if not generate_data_flag and data.is_file():
+        logger.debug(f'Found data: {data}')
+        return pd.read_csv(data, index_col=0)
 
     dvalue = np.random.randn(n)
     value = np.array([np.sum(dvalue[:i]) for i in range(n+1)])
@@ -57,8 +57,8 @@ def generate_random_series(n: int = total_length, use_history: int = True):
     df['x'] = range(n)
     df['dvalue'] = dvalue
     df['value'] = value[1:]
-    df.to_csv(history)
-    logger.debug(f'Wrote history: {history}')
+    df.to_csv(data)
+    logger.debug(f'Wrote history: {data}')
     return df
 
 
@@ -134,8 +134,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser('Native regression of random time series')
     parser.add_argument('-p', '--predict',
                         dest='predict_offset', default=5, type=int)
-    parser.add_argument('-u', '--usehistory',
-                        dest='use_history', action='store_true')
+    parser.add_argument('-g', '--generate', help='If generate new data flag',
+                        dest='generate_data_flag', action='store_true')
+    parser.add_argument('-s', '--show', help='If show the image',
+                        dest='show_image_flag', action='store_true')
 
     option = parser.parse_args()
 
@@ -143,9 +145,9 @@ if __name__ == "__main__":
     logger.info(f'Start with {option}')
 
     predict_offset = option.predict_offset
-    use_history = option.use_history
+    generate_data_flag = option.generate_data_flag
 
-    df = generate_random_series(use_history=use_history)
+    df = generate_random_series(generate_data_flag=generate_data_flag)
     fit(df, predict_offset=predict_offset)
     print(df)
 
@@ -185,7 +187,9 @@ if __name__ == "__main__":
 
     fig.tight_layout()
     fig.savefig(root.joinpath(f'res/{suptitle}.jpg'))
-    plt.show()
+
+    if option.show_image_flag:
+        plt.show()
 
     logger.info('Finished')
 
