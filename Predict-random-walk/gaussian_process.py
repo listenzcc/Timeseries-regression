@@ -48,9 +48,9 @@ def fit(df: pd.DataFrame):
     testing_index = list(df.index)
 
     # Only train on the first half data
-    all_index = list(df.index[:int(total_length * 0.7)])
-    np.random.shuffle(all_index)
-    training_index = all_index[:training_samples]
+    training_half_index = list(df.index[:int(total_length * 0.7)])
+    np.random.shuffle(training_half_index)
+    training_index = training_half_index[:training_samples]
 
     # --------------------
     x_training = df.iloc[training_index]['x'].to_numpy()[:, np.newaxis]
@@ -75,9 +75,11 @@ def fit(df: pd.DataFrame):
     df['meanPred'] = None
     df['stdPred'] = None
     df['training'] = False
+    df['trainingHalf'] = False
     df.loc[testing_index, 'meanPred'] = mean_prediction
     df.loc[testing_index, 'stdPred'] = std_prediction
     df.loc[training_index, 'training'] = True
+    df.loc[training_half_index, 'trainingHalf'] = True
     df['diff'] = df['value'] - df['meanPred']
 
 
@@ -151,7 +153,7 @@ if __name__ == "__main__":
         ax.legend(labels=['meanPred', None, 'value', None])
 
     with use_ax(axs[1, 1], 'Diff') as ax:
-        sns.scatterplot(df, ax=ax, x='stdPred', y='diff',
+        sns.scatterplot(df[df['trainingHalf']], ax=ax, x='stdPred', y='diff',
                         hue='diff', palette=palette)
 
     fig.tight_layout()
