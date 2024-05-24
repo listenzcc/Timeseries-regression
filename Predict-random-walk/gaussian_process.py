@@ -41,7 +41,7 @@ from util.generate_data import generate_random_series
 # Function and class
 
 
-def fit(df: pd.DataFrame):
+def fit(df: pd.DataFrame, training_with_latest_point_flag: bool = False):
     total_length = len(df)
     training_samples = total_length // 10
 
@@ -51,6 +51,10 @@ def fit(df: pd.DataFrame):
     training_half_index = list(df.index[:int(total_length * 0.7)])
     np.random.shuffle(training_half_index)
     training_index = training_half_index[:training_samples]
+
+    # If required, add the latest observation to the training_index
+    if training_with_latest_point_flag:
+        training_index.append(df.index[-1])
 
     # --------------------
     x_training = df.iloc[training_index]['x'].to_numpy()[:, np.newaxis]
@@ -105,6 +109,8 @@ if __name__ == "__main__":
                         dest='generate_data_flag', action='store_true')
     parser.add_argument('-s', '--show', help='If show the image',
                         dest='show_image_flag', action='store_true')
+    parser.add_argument('-u', '--use-last', help='If use the latest point to train',
+                        dest='training_with_latest_point_flag', action='store_true')
 
     option = parser.parse_args()
 
@@ -112,7 +118,7 @@ if __name__ == "__main__":
     logger.info(f'Started with {option}')
 
     df = generate_random_series(generate_data_flag=option.generate_data_flag)
-    fit(df)
+    fit(df, option.training_with_latest_point_flag)
     print(df)
 
     k = np.max(df['diff'].map(np.abs))
@@ -157,7 +163,12 @@ if __name__ == "__main__":
                         hue='diff', palette=palette)
 
     fig.tight_layout()
-    fig.savefig(root.joinpath('res/gaussian_process.jpg'))
+    output_name = 'res/gaussian_process.jpg'
+
+    if option.training_with_latest_point_flag:
+        output_name = 'res/gaussian_process_fit_with_latest_point.jpg'
+
+    fig.savefig(root.joinpath(output_name))
 
     if option.show_image_flag:
         plt.show()
