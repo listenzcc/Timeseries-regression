@@ -102,10 +102,10 @@ if __name__ == '__main__':
 
     future = pd.DataFrame(testing_df['ds'])
     display(future)
-    prediction = m.predict(future)
-    prediction.index = testing_df.index
-    display(prediction)
-    testing_df['yhat'] = prediction['yhat']
+    forecast = m.predict(future)
+    forecast.index = testing_df.index
+    display(forecast)
+    testing_df['yhat'] = forecast['yhat']
     display(testing_df)
 
     # ----------------------------------------
@@ -135,13 +135,13 @@ if __name__ == '__main__':
             df, ax=ax, x='Date', y='value', color='#0003', zorder=2)
 
     with use_ax(axs[0, 1], 'Pred') as ax:
+        m.plot(forecast, ax=ax)
         sns.lineplot(
             df, ax=ax, x='Date', y='value', color='#333', size=1, legend=False, zorder=1)
         sns.scatterplot(
             df, ax=ax, x='Date', y='pred', hue="dvalue", palette=palette, zorder=2)
         sns.lineplot(
             df, ax=ax, x='Date', y='pred', color='#a00', size=1, legend=False, zorder=3)
-        ax.invert_yaxis()
 
     with use_ax(axs[1, 0], 'Diff: Value - prediction') as ax:
         sns.scatterplot(
